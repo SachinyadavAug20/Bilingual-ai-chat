@@ -80,8 +80,11 @@ Respond with ONLY a raw, valid JSON object matching this schema:
 }
 
 /**
- * Calls Google AI Studio OpenAI-compatible endpoint with automatic fallback
- * from gemini-2.5-flash to gemini-2.5-flash-lite.
+ * Calls Google AI Studio OpenAI-compatible endpoint with automatic fallback:
+ * 1. gemini-3.5-flash-lite (primary fast active model)
+ * 2. gemini-2.5-flash
+ * 3. gemini-2.0-flash
+ * If a model returns 503 (temporary high demand), waits 800ms and retries once before moving to the next model.
  */
 async function callGoogleAIStudio(
   messages: LLMMessage[],
@@ -92,59 +95,77 @@ async function callGoogleAIStudio(
     jsonResponse?: boolean;
   }
 ): Promise<LLMCallResult | null> {
-  const geminiModels = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+  const candidateModels = [
+    ...(process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL.trim()] : []),
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+  ].filter(Boolean);
 
-  for (const model of geminiModels) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
+  for (const model of candidateModels) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-      const payload: Record<string, unknown> = {
-        model,
-        messages,
-        temperature: options.temperature ?? 0.3,
-        max_tokens: options.maxTokens ?? 1500,
-      };
+        const payload: Record<string, unknown> = {
+          model,
+          messages,
+          temperature: options.temperature ?? 0.3,
+          max_tokens: options.maxTokens ?? 1500,
+        };
 
-      if (options.jsonResponse) {
-        payload.response_format = { type: "json_object" };
-      }
-
-      // Google AI Studio OpenAI-compatible endpoint without OpenRouter headers
-      const response = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
+        if (options.jsonResponse) {
+          payload.response_format = { type: "json_object" };
         }
-      );
 
-      clearTimeout(timeoutId);
+        // Google AI Studio OpenAI-compatible endpoint without OpenRouter headers
+        const response = await fetch(
+          "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          }
+        );
 
-      if (!response.ok) {
-        const errText = await response.text();
-        console.warn(`Google AI Studio ${model} failed (${response.status}): ${errText}`);
-        continue;
+        clearTimeout(timeoutId);
+
+        if (response.status === 503 && attempt === 0) {
+          console.warn(`Google AI Studio ${model} returned 503 (high demand); retrying after 800ms...`);
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          continue;
+        }
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.warn(`Google AI Studio ${model} failed (${response.status}): ${errText}`);
+          break;
+        }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+
+        if (!content || typeof content !== "string" || content.trim() === "") {
+          break;
+        }
+
+        return {
+          content: content.trim(),
+          model: data.model || model,
+        };
+      } catch (err: unknown) {
+        console.warn(`Google AI Studio ${model} attempt ${attempt + 1} error:`, err);
+        if (attempt === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          continue;
+        }
+        break;
       }
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content;
-
-      if (!content || typeof content !== "string" || content.trim() === "") {
-        continue;
-      }
-
-      return {
-        content: content.trim(),
-        model: data.model || model,
-      };
-    } catch (err: unknown) {
-      console.warn(`Google AI Studio ${model} error:`, err);
     }
   }
 
