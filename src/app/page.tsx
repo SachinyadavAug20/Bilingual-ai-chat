@@ -8,21 +8,57 @@ import { EmergencyAlertCard } from "@/components/EmergencyAlertCard";
 import { StarterChips } from "@/components/StarterChips";
 import { ArrowUp, Loader2 } from "lucide-react";
 
+const STORAGE_KEY = "parenting_coach_messages";
+
 export default function HomePage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Load chat history from localStorage on initial mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load chat history from localStorage:", e);
+    } finally {
+      setIsLoaded(true);
+    }
+  }, []);
+
+  // Save chat history to localStorage on every change (after initial hydration)
+  useEffect(() => {
+    if (!isLoaded) return;
+    try {
+      if (messages.length > 0) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch (e) {
+      console.warn("Failed to persist chat history to localStorage:", e);
+    }
+  }, [messages, isLoaded]);
+
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading]);
+    if (isLoaded) {
+      scrollToBottom();
+    }
+  }, [messages, isLoading, isLoaded]);
 
   const handleSendMessage = async (textToSend?: string) => {
     const messageContent = (textToSend ?? input).trim();
@@ -93,6 +129,11 @@ export default function HomePage() {
   const clearChat = () => {
     setMessages([]);
     setError(null);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {
+      console.warn("Failed to remove chat history from localStorage:", e);
+    }
   };
 
   return (
@@ -116,7 +157,7 @@ export default function HomePage() {
 
       {/* 2. Messages Canvas */}
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-6 flex flex-col justify-between">
-        {messages.length === 0 ? (
+        {!isLoaded ? null : messages.length === 0 ? (
           /* Empty State */
           <div className="my-auto py-12 flex flex-col items-center justify-center text-center space-y-6">
             <p className="text-sm text-stone-400 dark:text-stone-500">
