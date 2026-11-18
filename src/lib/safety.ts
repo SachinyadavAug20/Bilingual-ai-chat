@@ -145,21 +145,22 @@ const CRISIS_PATTERNS = [
 
 // Stage 1 Deterministic Medical / Legal Boundaries
 const MEDICAL_PATTERNS = [
-  /\b(?:prescrib|dos(?:e|age)|how\s+many\s+mg|paracetamol\s+(?:dose|amount)|calpol\s+dose|antibiotic|diagnos(?:e|is)|has\s+adhd|has\s+autism|does\s+my\s+child\s+have\s+depression|bipolar)\b/i,
+  /\b(?:prescrib|dos(?:e|age)|how\s+many\s+mg|\bmg\b|paracetamol|calpol|ibuprofen|antibiotic|diagnos(?:e|is)|adhd|autism|depression|bipolar|fever\s+medicine)\b/i,
   /دوائی\s*کی\s*مقدار/,
   /شربت\s*کی\s*خوراک/,
   /طبی\s*تشخیص/,
   /اے\s*ڈی\s*ایچ\s*ڈی/,
   /آٹزم/,
-  /\b(?:dawai\s+ki\s+miqdar|dose\s+kitni|bimari\s+hai|adhd\s+hai|autism\s+hai)\b/i,
+  /\b(?:dawai|dawa\b|dose|bimari|adhd|autism)\b/i,
 ];
 
 const LEGAL_PATTERNS = [
-  /\b(?:custody\s+battle|sue\s+my|divorce\s+court|legal\s+rights|court\s+order|child\s+support\s+law|custody\s+agreement)\b/i,
+  /\b(?:custody|family\s+court|divorce|lawsuit|sue\s+my|court\s+order|child\s+support\s+law|custody\s+agreement|custody\s+battle|legal\s+rights|legal\s+custody)\b/i,
   /عدالتی\s*کارروائی/,
   /طلاق\s*کا\s*کیس/,
   /قانونی\s*حق/,
-  /\b(?:court\s+case|kanoni\s+haq|talaq\s+ka\s+faisla|custody\s+ka\s+case)\b/i,
+  /کسٹڈی/,
+  /\b(?:court\s+case|kanoni\s+haq|talaq\s+ka\s+faisla|custody|family\s+court)\b/i,
 ];
 
 export interface SafetyCheckResult {
