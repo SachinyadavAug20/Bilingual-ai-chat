@@ -1,4 +1,8 @@
-import { CoachingResponse, CoachingResponseSchema } from "@/types";
+import {
+  CoachingResponse,
+  CoachingResponseSchema,
+  truncateToWordLimit,
+} from "@/types";
 import { ParentingPlaybook } from "@/types";
 
 export interface LLMMessage {
@@ -13,6 +17,67 @@ export interface LLMCallResult {
 
 // In-memory cache for dynamic free models
 let cachedLiveFreeModels: { models: string[]; expiresAt: number } | null = null;
+
+/**
+ * Builds the formal, high-precision coaching system prompt enforcing
+ * WhatsApp-ready brevity, strict length caps, and safety boundaries.
+ */
+export function buildCoachingSystemPrompt(options: {
+  language: "en" | "ur";
+  playbookContext: string;
+  boundaryNotice?: string;
+}): string {
+  const isUrdu = options.language === "ur";
+
+  return `You are an expert, calm, and practical AI parenting coach providing brief, structured, WhatsApp-scannable guidance.
+
+ROLE & COMMUNICATION STYLE:
+- A stressed parent is reading this on their phone; every second counts.
+- Be compassionate, grounded, and ultra-concise. Zero generic fluff, preambles, or conversational filler.
+- Language Mirroring: The user is communicating in ${isUrdu ? "Urdu (or Roman Urdu)" : "English"}. You MUST reply entirely in ${isUrdu ? "natural, everyday Urdu script (اردو رسم الخط)" : "clear, simple English"}. Never mix languages awkwardly.
+- Output: Set "language": "${isUrdu ? "ur" : "en"}".
+
+STRICT BREVITY & WORD LIMITS (MANDATORY):
+1. "empathy": EXACTLY 1 short validating sentence (MAX 12 words).
+2. "steps": EXACTLY 2 or 3 ultra-crisp action bullets, imperative tone (MAX 12 words per step).
+3. "avoid": EXACTLY 1 concrete thing NOT to say or do (MAX 12 words).
+4. "checkIn":
+   - "question": 1 simple follow-up question (MAX 15 words).
+   - "timeframe": A concrete timeframe (MAX 6 words, e.g. "Tonight after bedtime" or "In 24 hours").
+Total words across all fields MUST stay under 75 words.
+
+STRICT SAFETY & NON-CLINICAL BOUNDARIES:
+- NEVER diagnose developmental, behavioral, or medical conditions (e.g., ADHD, autism, anxiety, depression).
+- NEVER recommend medications, prescriptions, or dosages (e.g., paracetamol/calpol mg).
+- NEVER provide legal or custody instructions.
+${
+  options.boundaryNotice
+    ? `- CRITICAL BOUNDARY ACTIVE: ${options.boundaryNotice} State this non-clinical/non-legal boundary in one calm sentence and redirect to a licensed doctor or family lawyer, while offering safe everyday emotional support.`
+    : ""
+}
+- If any situation involves an emergency, child violence/abuse, or self-harm, immediately defer to crisis intervention.
+
+EVIDENCE PLAYBOOK GUIDANCE:
+${options.playbookContext}
+
+OUTPUT FORMAT:
+Respond with ONLY a raw, valid JSON object matching this schema:
+{
+  "language": "${isUrdu ? "ur" : "en"}",
+  "empathy": "1 validating sentence (max 12 words)",
+  "steps": [
+    "Step 1 (imperative, max 12 words)",
+    "Step 2 (imperative, max 12 words)",
+    "Step 3 (optional, max 12 words)"
+  ],
+  "avoid": "1 thing not to do (max 12 words)",
+  "checkIn": {
+    "question": "1 follow-up question (max 15 words)",
+    "timeframe": "timeframe (max 6 words)"
+  },
+  "playbookSource": "Playbook title"
+}`;
+}
 
 /**
  * Dynamically queries OpenRouter catalog to find currently online :free chat models,
@@ -252,7 +317,7 @@ export async function callOpenRouterWithFallback(
 }
 
 /**
- * Generates an evidence-grounded fallback response when API keys are absent or services are unreachable.
+ * Generates an ultra-brief, WhatsApp-scannable fallback response adhering strictly to word caps.
  */
 export function generateMockPlaybookResponse(
   playbook: ParentingPlaybook,
@@ -260,52 +325,73 @@ export function generateMockPlaybookResponse(
   boundaryNotice?: string
 ): CoachingResponse {
   if (language === "ur") {
+    const empathy = boundaryNotice
+      ? "طبی یا قانونی مشورہ ممکن نہیں، لیکن میں ساتھ ہوں۔"
+      : "بچے کی پرورش میں ایسے لمحات واقعی صبر آزماتے ہیں۔";
+
     return CoachingResponseSchema.parse({
       language: "ur",
-      empathy: boundaryNotice
-        ? `${boundaryNotice} میں آپ کی فکر اور محبت کو بخوبی سمجھ سکتا ہوں۔`
-        : "بچے کی پرورش میں ایسے لمحات صبر آزما ہوتے ہیں، آپ کی پریشانی بالکل فطری ہے۔",
+      empathy: truncateToWordLimit(empathy, 12),
       steps: [
-        playbook.actionPrinciples[0]
-          ? `پہلا قدم: ${playbook.actionPrinciples[0]}`
-          : "سب سے پہلے اپنا لہجہ اور غصہ قابو میں رکھیں اور بچے کی سطح پر آئیں۔",
-        playbook.actionPrinciples[1]
-          ? `دوسرا قدم: ${playbook.actionPrinciples[1]}`
-          : "بچے کے جذبات کو تسلیم کریں اور پیار سے بات سنیں۔",
-        "صورتحال پرسکون ہونے کے بعد ہی بچے کو دوستانہ انداز میں سمجھائیں۔",
+        truncateToWordLimit(
+          "اپنا لہجہ دھیما رکھیں اور بچے کی سطح پر بیٹھیں۔",
+          12
+        ),
+        truncateToWordLimit(
+          "پہلے بچے کے جذبات تسلیم کریں، پھر دھیان بٹائیں۔",
+          12
+        ),
+        truncateToWordLimit(
+          "بحث کیے بغیر نرمی سے اپنے اصول پر قائم رہیں۔",
+          12
+        ),
       ],
-      avoid:
-        playbook.avoidPrinciples[0] ||
-        "غصے میں چیخنے، مارنے یا موازنہ کرنے سے گریز کریں۔",
+      avoid: truncateToWordLimit(
+        "غصے میں چیخنے، مارنے یا طعنہ دینے سے پرہیز کریں۔",
+        12
+      ),
       checkIn: {
-        question:
-          "کیا اس تدبیر کے بعد بچے کے رویے یا ردعمل میں کوئی بہتری محسوس ہوئی؟",
-        timeframe: "اگلے 24 سے 48 گھنٹوں میں جائزہ لیں",
+        question: truncateToWordLimit(
+          "پرسکون ہونے کے بعد بچے کا رویہ کیسا رہا؟",
+          15
+        ),
+        timeframe: truncateToWordLimit("آج رات سونے کے بعد", 6),
       },
-      playbookSource: `${playbook.titleUrdu} (${playbook.title})`,
+      playbookSource: playbook.titleUrdu,
     });
   }
 
+  const empathy = boundaryNotice
+    ? "I cannot provide medical or legal advice, but I support you."
+    : "I hear how challenging this moment is; your patience is admirable.";
+
   return CoachingResponseSchema.parse({
     language: "en",
-    empathy: boundaryNotice
-      ? `${boundaryNotice} I hear how deeply you care about handling this thoughtfully.`
-      : "Parenting through these challenging moments is genuinely tough, and your patience is admirable.",
+    empathy: truncateToWordLimit(empathy, 12),
     steps: [
-      playbook.actionPrinciples[0] ||
-        "Get down to your child's eye level and maintain a calm, steady voice.",
-      playbook.actionPrinciples[1] ||
-        "Acknowledge their underlying emotion before trying to redirect their behavior.",
-      playbook.actionPrinciples[2] ||
-        "Hold the boundary gently but firmly without engaging in back-and-forth arguments.",
+      truncateToWordLimit(
+        "Get down to eye level and speak in a calm, quiet tone.",
+        12
+      ),
+      truncateToWordLimit(
+        "Acknowledge their big feelings before attempting to redirect their behavior.",
+        12
+      ),
+      truncateToWordLimit(
+        "Hold the boundary kindly but firmly without arguing back.",
+        12
+      ),
     ],
-    avoid:
-      playbook.avoidPrinciples[0] ||
-      "Avoid matching their emotional escalation with shouting or hasty punishments.",
+    avoid: truncateToWordLimit(
+      "Avoid yelling, lengthy lecturing, or negotiating during a meltdown.",
+      12
+    ),
     checkIn: {
-      question:
-        "How did your child respond once the initial intensity had subsided?",
-      timeframe: "Check back in after the next 24 to 48 hours",
+      question: truncateToWordLimit(
+        "How did your child respond after the intensity passed?",
+        15
+      ),
+      timeframe: truncateToWordLimit("Tonight after bedtime", 6),
     },
     playbookSource: playbook.title,
   });

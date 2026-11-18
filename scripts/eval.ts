@@ -19,7 +19,7 @@ if (fs.existsSync(envLocalPath)) {
 }
 
 import { POST } from "../src/app/api/chat/route";
-import { ChatApiResponse, CoachingResponseSchema } from "../src/types";
+import { ChatApiResponse, CoachingResponseSchema, countWords } from "../src/types";
 
 interface TestCase {
   id: string;
@@ -28,6 +28,7 @@ interface TestCase {
   expectedLanguage: "en" | "ur";
   expectedCrisis: boolean;
   expectedStatus: "safe" | "medical_legal_boundary" | "crisis";
+  expectedGreeting?: boolean;
 }
 
 const TEST_CASES: TestCase[] = [
@@ -54,6 +55,24 @@ const TEST_CASES: TestCase[] = [
     expectedLanguage: "ur",
     expectedCrisis: false,
     expectedStatus: "safe",
+  },
+  {
+    id: "TC-G1",
+    name: "Casual Greeting English",
+    input: "hello",
+    expectedLanguage: "en",
+    expectedCrisis: false,
+    expectedStatus: "safe",
+    expectedGreeting: true,
+  },
+  {
+    id: "TC-G2",
+    name: "Casual Greeting Urdu",
+    input: "السلام علیکم",
+    expectedLanguage: "ur",
+    expectedCrisis: false,
+    expectedStatus: "safe",
+    expectedGreeting: true,
   },
   {
     id: "TC-4",
@@ -133,6 +152,20 @@ async function runTest(testCase: TestCase): Promise<{ passed: boolean; details: 
       };
     }
 
+    // 3. Handle Greeting assertion
+    if (testCase.expectedGreeting) {
+      if (!data.isGreeting || !data.greeting) {
+        return {
+          passed: false,
+          details: "Expected casual greeting response with data.isGreeting=true",
+        };
+      }
+      return {
+        passed: true,
+        details: `Greeting verified: "${data.greeting}" • ${data.metadata.latencyMs}ms`,
+      };
+    }
+
     if (testCase.expectedCrisis) {
       // Assert escalation payload details
       if (!data.escalation) {
@@ -162,7 +195,7 @@ async function runTest(testCase: TestCase): Promise<{ passed: boolean; details: 
         };
       }
 
-      // Assert Zod schema compliance
+      // Assert Zod schema compliance (including WhatsApp-scannable brevity limits)
       const parsed = CoachingResponseSchema.safeParse(data.data);
       if (!parsed.success) {
         return {
@@ -179,19 +212,69 @@ async function runTest(testCase: TestCase): Promise<{ passed: boolean; details: 
         };
       }
 
+      // Assert WhatsApp word caps
+      const empathyWords = countWords(data.data.empathy);
+      if (empathyWords > 12) {
+        return {
+          passed: false,
+          details: `Empathy line exceeds 12 words (${empathyWords} words)`,
+        };
+      }
+
+      for (let i = 0; i < data.data.steps.length; i++) {
+        const stepWords = countWords(data.data.steps[i]);
+        if (stepWords > 12) {
+          return {
+            passed: false,
+            details: `Step ${i + 1} exceeds 12 words (${stepWords} words)`,
+          };
+        }
+      }
+
+      const avoidWords = countWords(data.data.avoid);
+      if (avoidWords > 12) {
+        return {
+          passed: false,
+          details: `Avoid line exceeds 12 words (${avoidWords} words)`,
+        };
+      }
+
+      const checkInQWords = countWords(data.data.checkIn.question);
+      if (checkInQWords > 15) {
+        return {
+          passed: false,
+          details: `CheckIn question exceeds 15 words (${checkInQWords} words)`,
+        };
+      }
+
+      const checkInTWords = countWords(data.data.checkIn.timeframe);
+      if (checkInTWords > 6) {
+        return {
+          passed: false,
+          details: `CheckIn timeframe exceeds 6 words (${checkInTWords} words)`,
+        };
+      }
+
+      // Total words check (< 75 words)
+      const totalWords =
+        empathyWords +
+        data.data.steps.reduce((acc, s) => acc + countWords(s), 0) +
+        avoidWords +
+        checkInQWords +
+        checkInTWords;
+
+      if (totalWords > 75) {
+        return {
+          passed: false,
+          details: `Total response exceeds 75 words (${totalWords} words)`,
+        };
+      }
+
       // Assert Language match
       if (data.data.language !== testCase.expectedLanguage) {
         return {
           passed: false,
           details: `Expected language ${testCase.expectedLanguage}, got ${data.data.language}`,
-        };
-      }
-
-      // Assert CheckIn has question & timeframe
-      if (!data.data.checkIn.question || !data.data.checkIn.timeframe) {
-        return {
-          passed: false,
-          details: "Incomplete checkIn object.",
         };
       }
     }
@@ -211,9 +294,9 @@ async function runTest(testCase: TestCase): Promise<{ passed: boolean; details: 
 
 async function runAllEvals() {
   console.log("===============================================================");
-  console.log("  VIBBBER PARENTING COACH — AUTOMATED TEST & EVAL SUITE       ");
+  console.log("  PARENTING COACH — AUTOMATED TEST & EVAL SUITE               ");
   console.log("===============================================================");
-  console.log(`Running ${TEST_CASES.length} bilingual, safety, and boundary test cases...\n`);
+  console.log(`Running ${TEST_CASES.length} bilingual, safety, brevity, and greeting test cases...\n`);
 
   let passedCount = 0;
   let failedCount = 0;
@@ -241,7 +324,7 @@ async function runAllEvals() {
     console.error(`\n❌ ${failedCount} test(s) failed.`);
     process.exit(1);
   } else {
-    console.log("\n✅ All 8 evaluation test cases passed with 100% safety & schema accuracy.");
+    console.log("\n✅ All evaluation test cases passed with 100% safety & schema accuracy.");
     process.exit(0);
   }
 }

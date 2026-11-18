@@ -102,6 +102,8 @@ export default function HomePage() {
         role: "assistant",
         content: data.isCrisis
           ? data.escalation?.message || "Emergency safety intervention required."
+          : data.isGreeting
+          ? data.greeting || ""
           : data.data?.empathy || "",
         structured: data.data,
         escalation: data.escalation,
@@ -204,7 +206,12 @@ export default function HomePage() {
                           metadata={message.metadata}
                         />
                       ) : (
-                        <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800/80 p-4 text-sm sm:text-base text-stone-800 dark:text-stone-200">
+                        <div
+                          dir={isUrdu ? "rtl" : "ltr"}
+                          className={`rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800/80 p-4 text-sm sm:text-base text-stone-800 dark:text-stone-200 leading-relaxed ${
+                            isUrdu ? "font-urdu" : "font-sans"
+                          }`}
+                        >
                           {message.content}
                         </div>
                       )}

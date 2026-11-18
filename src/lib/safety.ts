@@ -66,6 +66,7 @@ export function detectLanguage(text: string): "en" | "ur" {
 
   // Check for common Roman Urdu words/markers
   const romanUrduMarkers = [
+    /\b(?:salam|salaam|assalam|aoa)\b/i,
     /\bmera\b/i,
     /\bmeri\b/i,
     /\bmere\b/i,
@@ -327,4 +328,44 @@ export function buildCrisisEscalation(
       "We are deeply concerned about your and your child's immediate safety. You do not have to carry this alone. Please pause, take a slow breath, ensure everyone is physically safe right now, and reach out immediately to one of these free, 24/7 emergency support services:",
     emergencyNumbers: EMERGENCY_NUMBERS_EN,
   };
+}
+
+/**
+ * Detects whether the user's input is a casual standalone greeting without an actual parenting concern.
+ */
+export function isCasualGreeting(text: string): boolean {
+  if (!text) return false;
+  const clean = text.trim().toLowerCase().replace(/[!?.,۔،؟]/g, "");
+  const words = clean.split(/\s+/).filter(Boolean);
+
+  if (words.length > 5) return false;
+
+  const concernIndicators = [
+    "child", "kid", "baby", "toddler", "son", "daughter", "tantrum", "sleep", "eat", "school",
+    "fever", "ipad", "screen", "fight", "hit", "help", "problem", "advice", "cry", "yell",
+    "بچہ", "بیٹا", "بیٹی", "نیند", "ضد", "مار", "اسکول", "کھانا", "بخار", "پریشانی", "مسئلہ",
+    "bacha", "bache", "bachay", "bachi", "neend", "zidd", "zid", "larai"
+  ];
+
+  if (words.some((w) => concernIndicators.includes(w))) {
+    return false;
+  }
+
+  const greetingPatterns = [
+    /^(?:hi|hii|hiii|hello|helloo|hey|heyy|howdy|sup|good\s+morning|good\s+afternoon|good\s+evening)$/i,
+    /^(?:salam|salaam|assalam\s*o?\s*alaikum|asalam\s*alaikum|aoa|kya\s+hal\s+hai|kaise\s+ho|kese\s+ho)$/i,
+    /^(?:سلام|السلام\s*علیکم|وعلیکم\s*السلام|آداب|ہیلو)$/,
+  ];
+
+  return greetingPatterns.some((pattern) => pattern.test(clean));
+}
+
+/**
+ * Returns a 1-sentence warm welcome asking what parenting challenge they'd like help with today.
+ */
+export function buildGreetingResponse(language: "en" | "ur"): string {
+  if (language === "ur") {
+    return "السلام علیکم! آج آپ اپنے بچے کے کس معاملے یا الجھن میں رہنمائی چاہتے ہیں؟";
+  }
+  return "Hello! What parenting challenge can I help you navigate with your child today?";
 }

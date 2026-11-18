@@ -4,14 +4,18 @@ import {
   ChatApiResponse,
   CoachingResponse,
   CoachingResponseSchema,
+  truncateToWordLimit,
 } from "@/types";
 import {
   buildCrisisEscalation,
+  buildGreetingResponse,
   detectLanguage,
+  isCasualGreeting,
   runSafetyClassifier,
 } from "@/lib/safety";
 import { formatPlaybookForPrompt, retrievePlaybook } from "@/lib/rag";
 import {
+  buildCoachingSystemPrompt,
   callOpenRouterWithFallback,
   cleanAndParseJson,
   generateMockPlaybookResponse,
@@ -65,7 +69,24 @@ export async function POST(request: Request): Promise<NextResponse<ChatApiRespon
     // Detect language from the latest message
     const language = detectLanguage(latestUserMessage);
 
-    // Stage 1 & 2: Safety Gate
+    // 1. Casual Greeting Detection ("hi", "hello", "salam", "السلام علیکم")
+    if (isCasualGreeting(latestUserMessage)) {
+      const greeting = buildGreetingResponse(language);
+      return NextResponse.json({
+        success: true,
+        isCrisis: false,
+        isGreeting: true,
+        greeting,
+        metadata: {
+          safetyStatus: "safe",
+          playbookSource: "Casual Greeting",
+          modelUsed: "greeting-handler",
+          latencyMs: Date.now() - startTime,
+        },
+      });
+    }
+
+    // 2. Stage 1 & 2: Safety Gate
     const safetyResult = await runSafetyClassifier(latestUserMessage);
 
     // IMMEDIATE CRISIS ESCALATION BYPASS
@@ -86,11 +107,11 @@ export async function POST(request: Request): Promise<NextResponse<ChatApiRespon
       });
     }
 
-    // Lightweight In-Memory RAG: Retrieve best matching parenting playbook
+    // 3. Lightweight In-Memory RAG: Retrieve best matching parenting playbook
     const { playbook, score } = retrievePlaybook(latestUserMessage);
     const playbookContext = formatPlaybookForPrompt(playbook, language);
 
-    // Generate Structured Coaching Response
+    // 4. Generate Structured Coaching Response
     let structuredResponse: CoachingResponse | null = null;
     let modelUsed = "in-memory-engine";
 
@@ -102,43 +123,11 @@ export async function POST(request: Request): Promise<NextResponse<ChatApiRespon
       try {
         const isUrdu = language === "ur";
 
-        const systemInstructions = `You are Vibbber, an evidence-based, empathetic, and practical AI parenting coach.
-Language Requirement:
-- The user is speaking in ${isUrdu ? "Urdu (or Roman Urdu)" : "English"}.
-- You MUST respond in ${isUrdu ? "natural, warm Urdu script (اردو رسم الخط)" : "clear, concise English"}.
-- Set "language": "${isUrdu ? "ur" : "en"}".
-
-Safety Boundaries:
-- NEVER diagnose medical or psychological conditions (e.g. ADHD, autism, depression, anxiety disorders).
-- NEVER prescribe medication, antibiotics, or give dosages (e.g. paracetamol/calpol mg).
-- NEVER give legal advice or custody instructions.
-${
-  safetyResult.status === "medical_legal_boundary"
-    ? `- CRITICAL: The user has asked a question touching on medical/legal boundaries. ${safetyResult.boundaryNotice} Clearly include this non-clinical disclaimer in your empathy or steps, and advise consulting a qualified doctor or legal professional.`
-    : ""
-}
-
-Parenting Playbook Guidance:
-${playbookContext}
-
-Format Requirement:
-You MUST respond with a single, valid JSON object matching this exact schema:
-{
-  "language": "${isUrdu ? "ur" : "en"}",
-  "empathy": "1 short validating sentence acknowledging the parent's feeling without lecturing",
-  "steps": [
-    "First brief, actionable step (imperative tone)",
-    "Second brief, actionable step",
-    "Third brief, actionable step (optional, maximum 3 total)"
-  ],
-  "avoid": "1 short thing NOT to say or do in this scenario",
-  "checkIn": {
-    "question": "A concrete follow-up question to reflect on",
-    "timeframe": "A concrete timeframe (e.g., 'after bedtime tonight' or 'in 24-48 hours')"
-  },
-  "playbookSource": "${isUrdu ? playbook.titleUrdu : playbook.title}"
-}
-Output ONLY raw JSON. No markdown code blocks, no other text.`;
+        const systemInstructions = buildCoachingSystemPrompt({
+          language,
+          playbookContext,
+          boundaryNotice: safetyResult.boundaryNotice,
+        });
 
         const conversationHistory: LLMMessage[] = [
           { role: "system", content: systemInstructions },
@@ -150,16 +139,52 @@ Output ONLY raw JSON. No markdown code blocks, no other text.`;
 
         const llmResult = await callOpenRouterWithFallback(conversationHistory, {
           temperature: 0.3,
-          maxTokens: 1000,
+          maxTokens: 1500,
           jsonResponse: true,
         });
 
         modelUsed = llmResult.model;
         const parsed = cleanAndParseJson<CoachingResponse>(llmResult.content);
 
-        // Normalize steps count to 2-3 if model returned extra steps
-        if (Array.isArray(parsed.steps) && parsed.steps.length > 3) {
-          parsed.steps = parsed.steps.slice(0, 3);
+        // Normalize and enforce strict WhatsApp word caps before Zod validation
+        if (parsed.empathy) {
+          parsed.empathy = truncateToWordLimit(parsed.empathy, 12);
+        }
+
+        if (Array.isArray(parsed.steps)) {
+          parsed.steps = parsed.steps
+            .slice(0, 3)
+            .map((s) => truncateToWordLimit(String(s), 12));
+          // If less than 2 steps, supplement from evidence playbook
+          if (parsed.steps.length < 2) {
+            parsed.steps.push(
+              truncateToWordLimit(
+                isUrdu
+                  ? "بچے کے جذبات تسلیم کریں اور پیار سے بات سنیں۔"
+                  : "Acknowledge feelings before attempting to redirect behavior.",
+                12
+              )
+            );
+          }
+        }
+
+        if (parsed.avoid) {
+          parsed.avoid = truncateToWordLimit(parsed.avoid, 12);
+        }
+
+        if (parsed.checkIn) {
+          if (parsed.checkIn.question) {
+            parsed.checkIn.question = truncateToWordLimit(
+              parsed.checkIn.question,
+              15
+            );
+          }
+          if (parsed.checkIn.timeframe) {
+            parsed.checkIn.timeframe = truncateToWordLimit(
+              parsed.checkIn.timeframe,
+              6
+            );
+          }
         }
 
         // Ensure language is aligned
@@ -167,12 +192,15 @@ Output ONLY raw JSON. No markdown code blocks, no other text.`;
           parsed.language = isUrdu ? "ur" : "en";
         }
 
+        if (!parsed.playbookSource) {
+          parsed.playbookSource = isUrdu ? playbook.titleUrdu : playbook.title;
+        }
+
         const validated = CoachingResponseSchema.parse(parsed);
         validated.language = isUrdu ? "ur" : "en";
         structuredResponse = validated;
       } catch (llmError) {
         console.warn("LLM generation failed, falling back to evidence engine:", llmError);
-        // Fallback to grounded mock response
         structuredResponse = generateMockPlaybookResponse(
           playbook,
           language,
