@@ -6,16 +6,7 @@ import { detectLanguage } from "@/lib/safety";
 import { StructuredResponseCard } from "@/components/StructuredResponseCard";
 import { EmergencyAlertCard } from "@/components/EmergencyAlertCard";
 import { StarterChips } from "@/components/StarterChips";
-import {
-  Send,
-  Trash2,
-  Sparkles,
-  ShieldAlert,
-  ShieldCheck,
-  Heart,
-  Globe,
-  Loader2,
-} from "lucide-react";
+import { ArrowUp, Loader2 } from "lucide-react";
 
 export default function HomePage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -106,88 +97,39 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100">
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-20 border-b border-stone-200/80 dark:border-stone-800/80 bg-white/90 dark:bg-stone-900/90 backdrop-blur-md">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-600 dark:bg-emerald-500 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-              V
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-bold text-base sm:text-lg tracking-tight">
-                  Vibbber
-                </h1>
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
-                  Bilingual AI Coach
-                </span>
-              </div>
-              <p className="text-xs text-stone-500 dark:text-stone-400">
-                Evidence-based parenting advice in English & Urdu (اردو)
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {messages.length > 0 && (
-              <button
-                onClick={clearChat}
-                className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100 px-3 py-1.5 rounded-lg border border-stone-200 dark:border-stone-800 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
-                title="Clear conversation"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Clear Chat</span>
-              </button>
-            )}
-          </div>
+      {/* 1. Subtle, Minimal Top Bar */}
+      <header className="sticky top-0 z-10 border-b border-stone-200/60 dark:border-stone-800/60 bg-stone-50/80 dark:bg-stone-950/80 backdrop-blur-sm">
+        <div className="max-w-2xl mx-auto px-4 h-12 flex items-center justify-between">
+          <span className="text-sm font-medium text-stone-600 dark:text-stone-400">
+            Parenting Coach
+          </span>
+          {messages.length > 0 && (
+            <button
+              onClick={clearChat}
+              className="text-xs text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </header>
 
-      {/* Main Conversation Canvas */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 flex flex-col justify-between">
+      {/* 2. Messages Canvas */}
+      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-6 flex flex-col justify-between">
         {messages.length === 0 ? (
-          /* Welcome Screen */
-          <div className="my-auto py-8 text-center max-w-2xl mx-auto space-y-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 shadow-inner">
-              <Heart className="w-8 h-8" />
-            </div>
-
-            <div className="space-y-2">
-              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 dark:text-stone-100">
-                Calm, Practical Parenting Support
-              </h2>
-              <p className="text-sm sm:text-base text-stone-600 dark:text-stone-400 max-w-lg mx-auto">
-                Ask in English, Urdu script (اردو), or Roman Urdu. Get concise, structured guidance rooted in evidence playbooks with zero judgment.
-              </p>
-            </div>
-
-            {/* Feature Badges */}
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-2 text-xs">
-              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-300">
-                <Globe className="w-3.5 h-3.5 text-emerald-600" />
-                English & Urdu Script Mirroring
-              </span>
-              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-300">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                Empathy + 2-3 Action Steps + Check-In
-              </span>
-              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-300">
-                <ShieldCheck className="w-3.5 h-3.5 text-sky-600" />
-                Strict Safety Gate & Clinical Guardrails
-              </span>
-            </div>
-
-            {/* Starter Chips on Empty State */}
-            <div className="pt-6">
-              <StarterChips
-                onSelectPrompt={(prompt) => handleSendMessage(prompt)}
-                disabled={isLoading}
-              />
-            </div>
+          /* Empty State */
+          <div className="my-auto py-12 flex flex-col items-center justify-center text-center space-y-6">
+            <p className="text-sm text-stone-400 dark:text-stone-500">
+              How can I help with your child today?
+            </p>
+            <StarterChips
+              onSelectPrompt={(prompt) => handleSendMessage(prompt)}
+              disabled={isLoading}
+            />
           </div>
         ) : (
-          /* Active Chat Stream */
-          <div className="space-y-6 pb-6">
+          /* Chat Stream */
+          <div className="space-y-4 pb-4">
             {messages.map((message) => {
               const isUser = message.role === "user";
               const isUrdu = detectLanguage(message.content) === "ur";
@@ -200,18 +142,16 @@ export default function HomePage() {
                   }`}
                 >
                   {isUser ? (
-                    /* User Bubble */
                     <div
                       dir={isUrdu ? "rtl" : "ltr"}
-                      className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 bg-emerald-600 text-white shadow-sm text-sm sm:text-base leading-relaxed ${
+                      className={`max-w-[85%] rounded-2xl px-4 py-2.5 bg-stone-900 dark:bg-stone-100 text-stone-50 dark:text-stone-900 text-sm sm:text-base leading-relaxed ${
                         isUrdu ? "font-urdu" : "font-sans"
                       }`}
                     >
                       <p className="whitespace-pre-wrap">{message.content}</p>
                     </div>
                   ) : (
-                    /* Assistant Structured Bubble */
-                    <div className="w-full max-w-3xl">
+                    <div className="w-full">
                       {message.escalation ? (
                         <EmergencyAlertCard
                           escalation={message.escalation}
@@ -223,10 +163,8 @@ export default function HomePage() {
                           metadata={message.metadata}
                         />
                       ) : (
-                        <div className="p-4 rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800">
-                          <p className="whitespace-pre-wrap text-stone-800 dark:text-stone-200">
-                            {message.content}
-                          </p>
+                        <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800/80 p-4 text-sm sm:text-base text-stone-800 dark:text-stone-200">
+                          {message.content}
                         </div>
                       )}
                     </div>
@@ -237,17 +175,16 @@ export default function HomePage() {
 
             {/* Loading Indicator */}
             {isLoading && (
-              <div className="flex items-center gap-3 p-4 rounded-2xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 w-fit text-sm text-stone-500 animate-pulse">
-                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                <span>Consulting evidence playbook & safety gate...</span>
+              <div className="flex items-center gap-2 text-xs text-stone-400 py-1">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Thinking...</span>
               </div>
             )}
 
             {/* Error Message */}
             {error && (
-              <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-sm flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 shrink-0 text-rose-600" />
-                <span>{error}</span>
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-xs border border-red-200 dark:border-red-900">
+                {error}
               </div>
             )}
 
@@ -256,63 +193,43 @@ export default function HomePage() {
         )}
       </main>
 
-      {/* Sticky Bottom Input Area */}
-      <footer className="sticky bottom-0 z-20 border-t border-stone-200/80 dark:border-stone-800/80 bg-white/95 dark:bg-stone-900/95 backdrop-blur-md py-4">
-        <div className="max-w-4xl mx-auto px-4 space-y-3">
-          {/* Quick starter chips above input when chatting */}
-          {messages.length > 0 && (
-            <div className="hidden sm:block">
-              <StarterChips
-                onSelectPrompt={(prompt) => handleSendMessage(prompt)}
-                disabled={isLoading}
-              />
-            </div>
-          )}
-
-          {/* Form */}
+      {/* 3. Clean Input Bar */}
+      <footer className="sticky bottom-0 z-10 bg-stone-50/90 dark:bg-stone-950/90 backdrop-blur-md pb-4 pt-2">
+        <div className="max-w-2xl mx-auto px-4 space-y-2">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="flex items-end gap-2"
+            className="relative flex items-center"
           >
-            <div className="relative flex-1">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Describe your parenting challenge in English, اردو, or Roman Urdu..."
-                rows={2}
-                disabled={isLoading}
-                className="w-full resize-none rounded-2xl border border-stone-300 dark:border-stone-700 bg-stone-50/80 dark:bg-stone-800/80 px-4 py-3 text-sm sm:text-base text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:opacity-60"
-              />
-            </div>
-
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask a parenting concern in English or اردو..."
+              rows={1}
+              disabled={isLoading}
+              className="w-full resize-none rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 pl-4 pr-12 py-3 text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-stone-400 dark:focus:border-stone-600 transition-colors disabled:opacity-50"
+            />
             <button
               type="submit"
               disabled={isLoading || !input.trim()}
-              className="h-12 w-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-sm transition-all disabled:opacity-40 disabled:pointer-events-none hover:scale-105 active:scale-95"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 flex items-center justify-center transition-opacity disabled:opacity-20"
               title="Send message"
             >
               {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <Send className="w-5 h-5" />
+                <ArrowUp className="w-4 h-4" />
               )}
             </button>
           </form>
 
-          {/* Micro Footer Notice */}
-          <div className="flex items-center justify-between text-[11px] text-stone-400 px-1">
-            <span>
-              Zero login • No external database • Evidence playbooks
-            </span>
-            <span className="hidden sm:inline">
-              Not a medical doctor or legal service. Press Enter to send.
-            </span>
-          </div>
+          <p className="text-center text-[11px] text-stone-400 dark:text-stone-500">
+            Not medical or legal advice.
+          </p>
         </div>
       </footer>
     </div>
