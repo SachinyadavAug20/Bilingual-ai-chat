@@ -12,7 +12,7 @@ Minimal Next.js + TypeScript chat app supporting English and Urdu with structure
    ```bash
    cp .env.example .env.local
    ```
-   Set `OPENROUTER_API_KEY` in `.env.local`. The app uses `openrouter/free` with automatic fallback across live `:free` models.
+   Set `GEMINI_API_KEY` (primary provider via Google AI Studio's OpenAI-compatible endpoint with `gemini-2.5-flash` and `gemini-2.5-flash-lite`). Optionally set `OPENROUTER_API_KEY` as a secondary fallback.
 3. Start the development server:
    ```bash
    npm run dev
@@ -25,7 +25,7 @@ Run the automated evaluation suite:
 ```bash
 npm run eval
 ```
-Executes 8 automated test cases asserting schema validity, brevity, medical/legal boundary disclaimers, and 100% deterministic crisis escalation accuracy across English, Urdu script, and Roman Urdu.
+Executes 10 automated test cases asserting schema validity, WhatsApp-scannable brevity caps, casual greeting handling, medical/legal boundary disclaimers, and 100% deterministic crisis escalation accuracy across English, Urdu script, and Roman Urdu.
 
 ## Architecture & Safety Overview
 
@@ -33,7 +33,7 @@ Executes 8 automated test cases asserting schema validity, brevity, medical/lega
 - **Medical & Legal Boundaries**: Identifies requests for diagnoses, medication dosages, or custody disputes and attaches non-clinical/non-legal disclaimers directing to licensed professionals.
 - **In-Memory RAG** (`src/lib/rag.ts`): Lightweight BM25 token-overlap engine matches user input against 6 bilingual evidence-based parenting micro-playbooks (`src/data/playbooks.ts`).
 - **Structured Replies** (`src/types/index.ts`): Zod schema strictly enforces compact, practical outputs comprising one empathy sentence, 2 to 3 actionable steps, one thing to avoid, and a timed check-in question.
-- **Dynamic Model Fallback** (`src/lib/llm.ts`): Routes queries through `openrouter/free` and dynamically falls back to live high-performing `:free` models (or offline in-memory playbooks if no key is supplied).
+- **Multi-Provider Fallback** (`src/lib/llm.ts`): Primary inference via Google AI Studio (`gemini-2.5-flash` / `gemini-2.5-flash-lite`), secondary fallback via OpenRouter (`openrouter/free` and live `:free` models), and final offline fallback via in-memory playbooks.
 
 ## Coding Agent Workflow
 

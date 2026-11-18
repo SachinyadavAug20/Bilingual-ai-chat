@@ -244,7 +244,7 @@ export async function runSafetyClassifier(
   }
 
   // If no API key configured, trust Stage 1 result
-  if (!process.env.OPENROUTER_API_KEY) {
+  if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
     return stage1;
   }
 

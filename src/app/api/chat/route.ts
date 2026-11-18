@@ -116,8 +116,10 @@ export async function POST(request: Request): Promise<NextResponse<ChatApiRespon
     let modelUsed = "in-memory-engine";
 
     const hasApiKey =
-      Boolean(process.env.OPENROUTER_API_KEY) &&
-      process.env.OPENROUTER_API_KEY !== "your_api_key_here";
+      (Boolean(process.env.GEMINI_API_KEY?.trim()) &&
+        process.env.GEMINI_API_KEY !== "your_gemini_key_here") ||
+      (Boolean(process.env.OPENROUTER_API_KEY?.trim()) &&
+        process.env.OPENROUTER_API_KEY !== "your_api_key_here");
 
     if (hasApiKey) {
       try {
