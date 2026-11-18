@@ -156,9 +156,18 @@ Output ONLY raw JSON. No markdown code blocks, no other text.`;
 
         modelUsed = llmResult.model;
         const parsed = cleanAndParseJson<CoachingResponse>(llmResult.content);
-        const validated = CoachingResponseSchema.parse(parsed);
 
-        // Ensure language field matches detected language
+        // Normalize steps count to 2-3 if model returned extra steps
+        if (Array.isArray(parsed.steps) && parsed.steps.length > 3) {
+          parsed.steps = parsed.steps.slice(0, 3);
+        }
+
+        // Ensure language is aligned
+        if (!parsed.language || (parsed.language !== "en" && parsed.language !== "ur")) {
+          parsed.language = isUrdu ? "ur" : "en";
+        }
+
+        const validated = CoachingResponseSchema.parse(parsed);
         validated.language = isUrdu ? "ur" : "en";
         structuredResponse = validated;
       } catch (llmError) {
