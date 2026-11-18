@@ -18,8 +18,6 @@ import {
   LLMMessage,
 } from "@/lib/llm";
 
-export const dynamic = "force-dynamic";
-
 export async function POST(request: Request): Promise<NextResponse<ChatApiResponse>> {
   const startTime = Date.now();
 
